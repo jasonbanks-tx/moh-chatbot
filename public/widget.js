@@ -1,5 +1,5 @@
 (function () {
-  const API_URL = "https://moh-chatbot.vercel.app/api/chat";
+  const API_URL = "https://moh-chatbot-tau.vercel.app/api/chat";
 
   // Styles
   const style = document.createElement("style");
