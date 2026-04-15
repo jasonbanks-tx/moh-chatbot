@@ -5,9 +5,9 @@
   const style = document.createElement("style");
   style.textContent = `
     @keyframes moh-pulse {
-      0% { box-shadow: 0 4px 12px rgba(0,0,0,0.3), 0 0 0 0 rgba(26,58,92,0.5); }
-      70% { box-shadow: 0 4px 12px rgba(0,0,0,0.3), 0 0 0 12px rgba(26,58,92,0); }
-      100% { box-shadow: 0 4px 12px rgba(0,0,0,0.3), 0 0 0 0 rgba(26,58,92,0); }
+      0% { box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 0 rgba(26,58,92,0.35); }
+      70% { box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 12px rgba(26,58,92,0); }
+      100% { box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 0 rgba(26,58,92,0); }
     }
     @keyframes moh-bounce {
       0%, 100% { transform: translateY(0); }
@@ -29,23 +29,24 @@
       width: 60px;
       height: 60px;
       border-radius: 50%;
-      background: #1a3a5c;
-      border: none;
+      background: #ffffff;
+      border: 2px solid #e5e7eb;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       z-index: 99999;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: transform 0.2s, background 0.2s;
+      transition: transform 0.2s, background 0.2s, border-color 0.2s;
       animation: moh-pulse 2s ease-in-out infinite;
     }
     #moh-chat-btn:hover {
       transform: scale(1.08);
-      background: #244d75;
+      background: #f8f9fa;
+      border-color: #1a3a5c;
       animation: none;
     }
-    #moh-chat-btn svg { width: 28px; height: 28px; fill: white; }
+    #moh-chat-btn svg { width: 28px; height: 28px; fill: #1a3a5c; }
     #moh-chat-btn.active { animation: none; }
 
     /* Notification dot */
