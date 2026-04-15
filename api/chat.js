@@ -1,5 +1,5 @@
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = "gemini-2.5-flash";
+const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
 
 const SYSTEM_PROMPT = `You are a friendly, professional customer support agent for Movers of Houston, a licensed and insured moving company in Houston, Texas.
 
@@ -216,43 +216,52 @@ export default async function handler(req, res) {
       parts: [{ text: msg.content }],
     }));
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: {
-            parts: [{ text: SYSTEM_PROMPT }],
-          },
-          contents,
-          generationConfig: {
-            temperature: 0.7,
-            topP: 0.9,
-            maxOutputTokens: 512,
-          },
-          safetySettings: [
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-          ],
-        }),
-      }
-    );
+    let reply = null;
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error("Gemini API error:", errorData);
-      return res.status(500).json({
-        reply: "I'm having trouble connecting right now. Please call us at 281-377-4177 and we'll be happy to help!",
-      });
+    for (const model of MODELS) {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            system_instruction: {
+              parts: [{ text: SYSTEM_PROMPT }],
+            },
+            contents,
+            generationConfig: {
+              temperature: 0.7,
+              topP: 0.9,
+              maxOutputTokens: 512,
+            },
+            safetySettings: [
+              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+            ],
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        reply =
+          data.candidates?.[0]?.content?.parts?.[0]?.text ||
+          null;
+        if (reply) {
+          console.log("Success with model:", model);
+          break;
+        }
+      } else {
+        const errorData = await response.text();
+        console.error(`Model ${model} failed:`, errorData);
+      }
     }
 
-    const data = await response.json();
-    const reply =
-      data.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "I'm sorry, I couldn't process that. Please call us at 281-377-4177 for assistance!";
+    if (!reply) {
+      reply = "I'm having trouble connecting right now. Please call us at 281-377-4177 and we'll be happy to help!";
+    }
 
     return res.status(200).json({ reply });
   } catch (error) {
