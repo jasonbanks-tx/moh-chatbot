@@ -1,5 +1,6 @@
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+const GEMINI_MODEL = "gemini-2.5-flash";
+const MAX_RETRIES = 2;
 
 const SYSTEM_PROMPT = `You are a friendly, professional customer support agent for Movers of Houston, a licensed and insured moving company in Houston, Texas.
 
@@ -218,9 +219,13 @@ export default async function handler(req, res) {
 
     let reply = null;
 
-    for (const model of MODELS) {
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (attempt > 0) {
+        await new Promise((r) => setTimeout(r, 1000 * attempt));
+      }
+
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -246,16 +251,12 @@ export default async function handler(req, res) {
 
       if (response.ok) {
         const data = await response.json();
-        reply =
-          data.candidates?.[0]?.content?.parts?.[0]?.text ||
-          null;
-        if (reply) {
-          console.log("Success with model:", model);
-          break;
-        }
+        reply = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+        if (reply) break;
       } else {
         const errorData = await response.text();
-        console.error(`Model ${model} failed:`, errorData);
+        console.error(`Attempt ${attempt + 1} failed:`, errorData);
+        if (response.status !== 503 && response.status !== 429) break;
       }
     }
 
