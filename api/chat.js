@@ -204,12 +204,17 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  const startTime = Date.now();
+
   try {
     const { messages } = req.body;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: "Messages array is required" });
     }
+
+    // Get the latest user message for logging
+    const latestUserMsg = messages.filter((m) => m.role === "user").pop();
 
     // Build conversation for Gemini
     const contents = messages.map((msg) => ({
@@ -218,8 +223,11 @@ export default async function handler(req, res) {
     }));
 
     let reply = null;
+    let attempts = 0;
+    let finalStatus = "success";
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      attempts = attempt + 1;
       if (attempt > 0) {
         await new Promise((r) => setTimeout(r, 1000 * attempt));
       }
@@ -261,12 +269,35 @@ export default async function handler(req, res) {
     }
 
     if (!reply) {
+      finalStatus = "fallback";
       reply = "I'm having trouble connecting right now. Please call us at 281-377-4177 and we'll be happy to help!";
     }
+
+    // Structured log — Vercel captures this in the Logs tab
+    console.log(JSON.stringify({
+      type: "chat",
+      timestamp: new Date().toISOString(),
+      status: finalStatus,
+      attempts,
+      responseTimeMs: Date.now() - startTime,
+      messageCount: messages.length,
+      userMessage: latestUserMsg?.content?.slice(0, 200) || "",
+      replyPreview: reply.slice(0, 200),
+    }));
 
     return res.status(200).json({ reply });
   } catch (error) {
     console.error("Chat error:", error);
+
+    // Log errors too
+    console.log(JSON.stringify({
+      type: "chat_error",
+      timestamp: new Date().toISOString(),
+      status: "error",
+      responseTimeMs: Date.now() - startTime,
+      error: error.message,
+    }));
+
     return res.status(500).json({
       reply: "I'm having trouble right now. Please call us at 281-377-4177 and we'll be happy to help!",
     });
