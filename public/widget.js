@@ -280,7 +280,7 @@
     if (tooltip || isOpen) return;
     tooltip = document.createElement("div");
     tooltip.id = "moh-chat-tooltip";
-    tooltip.innerHTML = 'Need help with your move? <span id="moh-chat-tooltip-close">&times;</span>';
+    tooltip.innerHTML = '🤖 Got moving questions? Our AI can answer them! <span id="moh-chat-tooltip-close">&times;</span>';
     document.body.appendChild(tooltip);
 
     // Click tooltip to open chat
