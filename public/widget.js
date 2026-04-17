@@ -258,10 +258,23 @@
         border-radius: 10px;
       }
       #moh-chat-tooltip {
-        right: 80px;
-        bottom: 28px;
+        right: 10px;
+        bottom: 90px;
         font-size: 13px;
         padding: 8px 12px;
+        white-space: normal;
+        max-width: calc(100vw - 30px);
+        text-align: left;
+      }
+      #moh-chat-tooltip::after {
+        right: 18px;
+        top: auto;
+        bottom: -8px;
+        transform: none;
+        border-left: 8px solid transparent;
+        border-right: 8px solid transparent;
+        border-top: 8px solid white;
+        border-bottom: none;
       }
     }
   `;
@@ -423,3 +436,4 @@
     msgsEl.scrollTop = msgsEl.scrollHeight;
   }
 })();
+
