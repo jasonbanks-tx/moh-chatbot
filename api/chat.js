@@ -144,6 +144,17 @@ export default async function handler(req, res) {
     let reply = null;
     let attempts = 0;
     let finalStatus = "success";
+    // Google counts the model's hidden "thinking" and the visible reply against ONE limit
+    // (maxOutputTokens). With the old 512 limit and unlimited thinking, about 1 reply in 20 was
+    // cut off mid-sentence (measured live 2026-11-16: 2 of 40). So thinking is CAPPED
+    // (THINKING_BUDGET) and the limit is big enough (REPLY_LIMIT) that the reply always has at
+    // least REPLY_LIMIT - THINKING_BUDGET tokens left. Change these only with a fresh measurement.
+    const THINKING_BUDGET = 1024;
+    const REPLY_LIMIT = 2048;
+    let thinkingCapped = true;
+    let finishReason = null;
+    let thoughtsTokens = null;
+    let googleRequests = 0;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       attempts = attempt + 1;
@@ -151,6 +162,7 @@ export default async function handler(req, res) {
         await new Promise((r) => setTimeout(r, 1000 * attempt));
       }
 
+      googleRequests++;
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
         {
@@ -164,7 +176,8 @@ export default async function handler(req, res) {
             generationConfig: {
               temperature: 0.7,
               topP: 0.9,
-              maxOutputTokens: 512,
+              maxOutputTokens: REPLY_LIMIT,
+              ...(thinkingCapped ? { thinkingConfig: { thinkingBudget: THINKING_BUDGET } } : {}),
             },
             safetySettings: [
               { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
@@ -178,11 +191,29 @@ export default async function handler(req, res) {
 
       if (response.ok) {
         const data = await response.json();
-        reply = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+        // Put together every piece of the answer Google sent, skipping any hidden "thought" piece.
+        const parts = data.candidates?.[0]?.content?.parts;
+        const text = (Array.isArray(parts) ? parts : [])
+          .filter((part) => part && !part.thought && typeof part.text === "string")
+          .map((part) => part.text)
+          .join("")
+          .trim();
+        finishReason = data.candidates?.[0]?.finishReason || null;
+        thoughtsTokens = data.usageMetadata?.thoughtsTokenCount ?? null;
+        // MAX_TOKENS means Google ran out of room and the answer stops mid-sentence. Never show
+        // that to a customer: treat it as a failed try (it is retried, then the fallback).
+        reply = (text && finishReason !== "MAX_TOKENS") ? text : null;
         if (reply) break;
       } else {
         const errorData = await response.text();
         console.error(`Attempt ${attempt + 1} failed:`, errorData);
+        if (response.status === 400 && thinkingCapped) {
+          // Google refused the request with the thinking cap. Ask once more without it rather
+          // than fail the customer. This does not use up a retry.
+          thinkingCapped = false;
+          attempt--;
+          continue;
+        }
         if (response.status !== 503 && response.status !== 429) break;
       }
     }
@@ -198,6 +229,10 @@ export default async function handler(req, res) {
       timestamp: new Date().toISOString(),
       status: finalStatus,
       attempts,
+      googleRequests,
+      finishReason,
+      thoughtsTokens,
+      thinkingCapped,
       responseTimeMs: Date.now() - startTime,
       messageCount: messages.length,
       userMessage: latestUserMsg?.content?.slice(0, 200) || "",
